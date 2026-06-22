@@ -1,34 +1,134 @@
 # 🛡️ Cybersecurity AI Copilot (GraphRAG System)
 
-Aplikasi ini adalah **Agen AI Cybersecurity Cerdas** berbasis Graph Retrieval-Augmented Generation (GraphRAG). Sistem ini dirancang untuk membaca jutaan data ancaman siber (Phishing, Defacement, Malware) dan menggunakan kecerdasan buatan untuk memberikan rekomendasi keamanan secara *real-time*.
+Aplikasi ini adalah **Agen AI Cybersecurity Cerdas** berbasis *Graph Retrieval-Augmented Generation* (GraphRAG). Sistem ini mengintegrasikan *Graph Database* untuk memetakan hubungan struktural data ancaman siber (*Phishing*, *Defacement*, *Malware*) dan menggunakan LLM untuk memberikan analisis serta rekomendasi keamanan secara *real-time* bebas halusinasi.
+
+<br>
+
+## 🏗️ Arsitektur Sistem & Pipeline AI
+
+Sistem ini bergerak menggunakan arsitektur **Hybrid GraphRAG** yang memproses data terstruktur dan tidak terstruktur ke dalam satu pusat pengetahuan (*Knowledge Graph*), kemudian disajikan melalui antarmuka percakapan cerdas.
+
+Alur kerja (*pipeline*) data dibagi menjadi 4 fase utama di dalam file eksekusi `main.ipynb`:
+1. **Fase 1 (Setup & Connection):** Memuat kredensial lingkungan, mengecek koneksi Neo4j Sandbox, dan menginisialisasi LLM Engine (Groq Llama 3.3).
+2. **Fase 2 & 3 (Structured Ingestion):** Membaca dataset CSV, mengekstrak fitur komponen URL secara lokal menggunakan Python, dan melakukan *bulk ingestion* ke Neo4j menggunakan kueri Cypher native.
+3. **Fase 2.5 (Unstructured ETL):** Membaca teks laporan intelijen siber mentah, memanfaatkan LLM untuk mengekstrak entitas baru secara dinamis, melakukan *cleansing/normalization* data, dan menyuntikkannya ke graf.
+4. **Fase 4 (GraphRAG Chatbot Agent):** Mengonversi pertanyaan *natural language* user menjadi kueri Cypher (*Text-to-Cypher*), mengambil konteks nyata dari graf, dan menyusun jawaban komprehensif.
+
+<br>
+
+## 📊 Skema Graf & Logika Cypher
+
+### 1. Skema Database (Ontologi)
+Graf dirancang secara efisien dengan 4 jenis **Node** dan 3 jenis **Relasi** (*Edge*):
+* `(URL)` `-[:HAS_DOMAIN]->` `(Domain)`
+* `(URL)` `-[:HAS_TLD]->` `(TLD)`
+* `(URL)` `-[:IS_CLASSIFIED_AS]->` `(Label)`
+
+### 2. Logika Ingestion
+Proses memasukkan data massal menggunakan klausa `UNWIND` untuk iterasi cepat dan `MERGE` untuk mencegah duplikasi data (*idempotent*):
+```cypher
+UNWIND $data AS row
+MERGE (u:URL {id: row.url})
+MERGE (d:Domain {id: row.domain})
+MERGE (t:TLD {id: row.tld})
+MERGE (l:Label {id: row.label})
+
+MERGE (u)-[:HAS_DOMAIN]->(d)
+MERGE (u)-[:HAS_TLD]->(t)
+MERGE (u)-[:IS_CLASSIFIED_AS]->(l)
+
+```
+<img src="skema_db.png" width="700" alt="Skema Graph Database">
+
+*Deskripsi: Diagram ini memetakan cetak biru arsitektur data, menunjukkan bagaimana entitas utama (`URL`) secara struktural terhubung langsung dengan komponen penyusunnya (`Domain` dan `TLD`) serta entitas klasifikasi akhirnya (`Label`) melalui relasi yang terdefinisi secara ketat.*
+
+
+### 3. Logika Text-to-Cypher
+Untuk meningkatkan kecerdasan Agen AI, *prompt* dikunci dengan aturan ketat agar LLM selalu menggunakan pencarian fleksibel (`CONTAINS` dan `toLower()`). Hal ini memungkinkan pencarian berbasis kecocokan parsial/subdomain, bukan sekadar *exact match*.
+
+<br>
 
 ## 🚀 Fitur Utama (Tier 4 Capabilities)
 
-1. **Text-to-Cypher / Graph Analytics:** AI tidak hanya mencari teks, tetapi dapat menulis kueri database (Cypher) secara mandiri untuk melakukan perhitungan agregasi matematis dari puluhan ribu data.
-2. **LLM Graph Builder (Unstructured Data ETL):** Sistem mampu membaca teks berita mentah/artikel ancaman terbaru, mengekstrak entitasnya, dan secara otomatis menyusunnya menjadi relasi di dalam Graph Database.
-3. **Smart Fallback Reasoning (Nalar AI):** Jika URL atau ancaman baru tidak ditemukan di dalam database historis, AI tidak akan *error*. Ia akan bertindak sebagai analis siber menggunakan wawasan umumnya untuk membedah struktur domain (TLD), mendeteksi potensi *typosquatting*, dan memberikan mitigasi darurat.
+* **Text-to-Cypher Execution:** AI mampu menerjemahkan pertanyaan bahasa manusia menjadi kueri grafik kompleks, termasuk operasi agregasi (seperti menghitung total data atau mencari *top* entitas).
+* **LLM Graph Builder:** Menggunakan `LLMGraphTransformer` untuk membaca data tidak terstruktur (teks berita/laporan siber), mengekstrak entitas secara otomatis, dan melakukan normalisasi teks secara dinamis.
+* **Smart Fallback Reasoning:** Jika entitas yang dicari tidak ditemukan di database (`Context = []`), AI tidak akan memunculkan *error* atau berhalusinasi. AI akan beralih fungsi menjadi analis siber heuristik yang membedah struktur domain secara mandiri dan memberikan mitigasi risiko darurat.
+
+<br>
 
 ## 🛠️ Tech Stack
-* **Database:** Neo4j (Graph Database)
-* **LLM Engine:** Groq API (Llama-3.3-70b-versatile) untuk *inferencing* berkecepatan tinggi.
-* **Orchestration:** LangChain & LangChain Graph
-* **Data Processing:** Pandas & Python
+* **Graph Database:** Neo4j (Sandbox Cloud Instance)
+* **LLM Engine:** Groq API (`llama-3.3-70b-versatile`) - Inferensi super cepat untuk pemrosesan teks dan Cypher.
+* **Orchestration:** LangChain, LangChain Neo4j, & LangChain Experimental (`LLMGraphTransformer`).
+* **Data Processing:** Pandas, Urllib (URL Parser), & Python.
+
+<br>
+
+## ⚙️ Instalasi & Konfigurasi
+
+### 1. Prasyarat (Prerequisites)
+Pastikan sudah memiliki komponen berikut:
+* Python terinstal di sistem.
+* Akun aktif [Neo4j Sandbox](https://sandbox.neo4j.com/).
+* API Key aktif dari [Groq Console](https://console.groq.com/).
+
+### 2. Langkah Instalasi
+Clone repositori ini dan jalankan instalasi *library* yang dibutuhkan:
+```bash
+# Clone repositori
+git clone [https://github.com/username/graphrag-phishing.git](https://github.com/username/graphrag-phishing.git)
+cd graphrag-phishing
+```
+
+Di dalam Notebook Jupyter (`main.ipynb`), jalankan sel pertama untuk menginstal semua *dependencies*:
+```python
+%pip install python-dotenv pandas neo4j langchain-neo4j langchain-experimental langchain-groq
+```
+
+### 3. Konfigurasi Lingkungan (.env)
+Buat sebuah file bernama `.env` di direktori akar proyek ini, lalu isi dengan kredensial milikmu:
+```env
+NEO4J_URI=bolt://<isi-url-sandbox-kamu>:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=<isi-password-sandbox-kamu>
+GROQ_API_KEY=gsk_<isi-api-key-groq-kamu>
+```
+
+<br>
+
+## 🏃‍♂️ Cara Menjalankan Aplikasi
+
+Seluruh kode proyek ini dikemas secara terstruktur di dalam file **`main.ipynb`**. Ikuti urutan eksekusi berikut agar program berjalan normal:
+
+1. **Jalankan FASE 1:** Untuk memuat file `.env`, mengecek koneksi database, dan mengaktifkan mesin LLM Groq.
+2. **Jalankan FASE 2 & FASE 3 (Opsional):** * *Catatan:* Jika database Neo4j milikmu masih kosong, jalankan sel ini untuk memasukkan sampel 30.000 data dari `malicious_phish.csv`.
+   * *Peringatan:* Jika database sudah terisi dari sesi sebelumnya, **lewati fase ini** atau bersihkan database terlebih dahulu lewat Neo4j Browser menggunakan perintah `MATCH (n) DETACH DELETE n` untuk menghindari duplikasi data.
+3. **Jalankan FASE 2.5 (Opsional):** Jalankan sel ini jika ingin menguji kemampuan AI dalam mengekstrak dan memasukkan data dari teks laporan tidak terstruktur (Kasus Link Phishing BCA).
+4. **Jalankan FASE 4:** Jalankan sel ini untuk membuka antarmuka Chatbot interaktif. Ketik pertanyaanmu langsung di kotak input yang disediakan di dalam notebook VS Code. Ketik `exit` untuk menyudahi sesi.
+
+<br>
 
 ## 📸 Dokumentasi & Hasil Pengujian
 
-*(Ganti teks di bawah ini dengan gambar screenshot yang kamu ambil)*
-
 ### 1. Visualisasi Graph Database
-> `![Screenshot Visualisasi Neo4j Sandbox](link-gambar-di-sini)`
-> Visualisasi relasi antara Node URL, Domain, TLD, dan Label Klasifikasi Ancaman dari 30.000 data dataset.
+<img src="dokumentasi1.png" width="700" alt="Visualisasi Graph Database">
 
-### 2. Skenario Pengujian: Analisis TLD Paling Berbahaya (Agregasi Graf)
-> `![Screenshot Test Agregasi](link-gambar-di-sini)`
-> AI berhasil menghitung dan mengurutkan Top-Level Domain (TLD) yang paling banyak digunakan untuk *phishing* langsung dari database.
+*Deskripsi: Tampilan visual kluster radial (Starburst Pattern) pada Neo4j Browser. Ratusan Node URL terlihat berkerumun secara efisien ke satu Node Label tunggal. Visualisasi ini membuktikan bahwa klausa `MERGE` pada pipeline ETL data terstruktur berhasil melakukan deduplikasi entitas secara sempurna.*
 
-### 3. Skenario Pengujian: Smart Fallback (Deteksi Taktik Social Engineering)
-> `![Screenshot Test Link Random](link-gambar-di-sini)`
-> AI membedah tautan asing (`netflix-update-payment.xyz`) yang tidak ada di database dan berhasil mendeteksi manipulasi *typosquatting*.
+### 2. Skenario Pengujian: Kueri Agregasi Graf (Text-to-Cypher)
+![Screenshot Test Agregasi](dokumentasi2.png)
 
----
-**Dikembangkan untuk pemenuhan tugas implementasi sistem cerdas.**
+*Deskripsi: Pembuktian rantai proses (verbose) Agen AI saat mengekspekstasi kueri analitik. Ketika ditanya mengenai TLD paling dominan pada kasus phishing, LLM Groq secara cerdas menerjemahkannya menjadi kueri Cypher kompleks menggunakan agregasi `COUNT()`, memprosesnya di backend Neo4j, dan berhasil menarik data riil dari graf (.com dengan 379 data).*
+
+### 3. Skenario Pengujian: Efek Smart Fallback Heuristik
+![Screenshot Test Link Random](dokumentasi3.png)
+
+*Deskripsi: Demonstrasi fitur unggulan keselamatan RAG. Ketika diuji dengan tautan asing fiktif yang tidak terekam di database historis (Context = []), AI tidak mengalami halusinasi. Agen langsung mengaktifkan fungsi nalar kedua untuk membedah komponen struktur URL (Domain, Path, Parameter) secara mandiri guna memberikan analisis risiko dan rekomendasi mitigasi darurat.*
+
+<br>
+
+## 👥 Tim Pengembang
+
+Proyek ini dirancang dan dikembangkan oleh:
+* **Diva Nesia Putri** - 5026231020
+* **Shahnaz Ariqah Simanullang** - 5026231087
