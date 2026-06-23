@@ -148,6 +148,8 @@ Kode yang dihasilkan oleh AI Assistant tidak diimplementasikan secara mentah. Ka
 * **Tuning Prompt Template:** Merombak instruksi `CYPHER_GENERATION_PROMPT` bawaan AI secara manual untuk memastikan *output* selalu konsisten menggunakan format *Markdown* dan bisa menangani limitasi kueri agregasi (seperti `COUNT` dan `ORDER BY DESC`).
 * **Pembatasan Scope Fallback:** Menambahkan instruksi manual pada rantai LangChain agar AI tidak berhalusinasi mengarang data statistik saat *database* kosong, melainkan hanya memberikan teori keamanan siber umum.
 
+<br>
+
 ## 👥 Tim Pengembang
 
 Proyek ini dirancang dan dikembangkan oleh:
