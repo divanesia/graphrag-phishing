@@ -127,6 +127,27 @@ Seluruh kode proyek ini dikemas secara terstruktur di dalam file **`main.ipynb`*
 
 <br>
 
+## 🤖 Dokumentasi Penggunaan AI (AI-Generated Code Disclosure)
+
+Berikut adalah dokumentasi transparansi penggunaan AI dalam membantu pengembangan kode dan penyelesaian masalah (*troubleshooting*) pada proyek Cybersecurity Copilot ini:
+
+### 1. Model AI yang Digunakan
+* **Model LLM Utama (dalam aplikasi):** Llama-3.3-70b-versatile (via Groq API)
+* **AI Assistant (untuk penulisan kode & diskusi):** Gemini / ChatGPT
+
+### 2. Prompt yang Dipakai 
+Dalam proses *development*, kami menggunakan AI Assistant untuk men-*generate* kerangka awal kode dan mencari solusi *error*. Berikut adalah beberapa *prompt* krusial yang kami gunakan:
+* *"Buatkan kerangka kode Python menggunakan LangChain untuk menghubungkan Neo4j Graph Database dengan LLM via Groq API menggunakan modul GraphCypherQAChain."*
+* *"Bagaimana cara membuat custom prompt template di LangChain agar AI bisa merespons sebagai Cybersecurity Analyst (Smart Fallback) jika kueri database mengembalikan hasil kosong / `Full Context: []`?"*
+* *"Bantu identifikasi dan berikan solusi untuk error 'Failed to read from defunct connection' saat idle terlalu lama di Neo4j Sandbox."*
+
+### 3. Modifikasi Manual yang Dilakukan terhadap Kode AI
+Kode yang dihasilkan oleh AI Assistant tidak diimplementasikan secara mentah. Kami melakukan penyesuaian dan modifikasi manual secara signifikan sebagai berikut:
+* **Penyesuaian Case-Sensitivity Cypher:** Mengubah logika kueri Cypher yang di-*generate* AI agar sesuai dengan skema asli di database (misalnya memastikan parameter pencarian seperti label `'phishing'` menggunakan huruf kecil semua agar kueri tidak gagal).
+* **Implementasi Auto-Recovery & Warm-up:** Menulis ulang bagian koneksi Neo4j driver untuk menangani *timeout* koneksi bawaan dari Neo4j Sandbox gratisan, memastikan sesi tetap hidup saat jeda interaksi.
+* **Tuning Prompt Template:** Merombak instruksi `CYPHER_GENERATION_PROMPT` bawaan AI secara manual untuk memastikan *output* selalu konsisten menggunakan format *Markdown* dan bisa menangani limitasi kueri agregasi (seperti `COUNT` dan `ORDER BY DESC`).
+* **Pembatasan Scope Fallback:** Menambahkan instruksi manual pada rantai LangChain agar AI tidak berhalusinasi mengarang data statistik saat *database* kosong, melainkan hanya memberikan teori keamanan siber umum.
+
 ## 👥 Tim Pengembang
 
 Proyek ini dirancang dan dikembangkan oleh:
